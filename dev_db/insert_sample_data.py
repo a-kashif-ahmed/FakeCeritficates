@@ -73,10 +73,6 @@ def insert_sample_data():
         VALUES ({placeholders})
     """, values)
 
-    
-
-
-
     # Update ui_settings with themes
     cursor.execute("""
         UPDATE ui_settings SET board_theme_id = 1, piece_theme_id = 1 WHERE user_id = 1
