@@ -73,6 +73,17 @@ def insert_sample_data():
         VALUES ({placeholders})
     """, values)
 
+    # OpenRouter
+    cursor.execute("""
+        INSERT OR IGNORE INTO external_apis (id, service_name, endpoint, api_key, validated)
+        VALUES (2, 'openrouter', 'https://openrouter.ai/api/v1/chat/completions', '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', 1)
+    """)
+
+    cursor.execute("""
+        INSERT OR IGNORE INTO ai_players (id, model_name, provider_id)
+        VALUES (2, 'google/gemini-2.5-flash', 2)
+    """)
+
     # Update ui_settings with themes
     cursor.execute("""
         UPDATE ui_settings SET board_theme_id = 1, piece_theme_id = 1 WHERE user_id = 1
