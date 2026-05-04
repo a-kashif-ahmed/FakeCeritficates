@@ -24,6 +24,11 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers (Content-Type, Authorization, etc.)
 )
 
+
+@app.get("/")
+def read_root():
+    return {"message": "Hello, FastAPI!"}
+
 app.include_router(settings_router)
 app.include_router(games_router)
 app.include_router(themes_router)
