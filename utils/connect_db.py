@@ -1,8 +1,11 @@
 from utils.get_parent_path import get_parent_path
 
 import sqlite3
+import os
 
 DB_PATH = get_parent_path() / "database" / "app.db"
+
+os.makedirs(DB_PATH.parent, exist_ok=True)
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
