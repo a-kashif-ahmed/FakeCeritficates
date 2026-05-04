@@ -75,10 +75,7 @@ def insert_sample_data():
 
     
 
-    cursor.execute("""
-        INSERT OR IGNORE INTO ai_players (id, model_name, provider_id)
-        VALUES (2, 'google/gemini-2.5-flash', 2)
-    """)
+
 
     # Update ui_settings with themes
     cursor.execute("""
