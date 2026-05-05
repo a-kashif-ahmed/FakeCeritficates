@@ -7,7 +7,7 @@ from pathlib import Path
 import sqlite3
 
 # On Vercel, only /tmp is writable
-DB_PATH = Path("/tmp/app.db")
+DB_PATH = get_parent_path()
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
