@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware  # 1. Import the middleware
 from routers.settings import router as settings_router
 from routers.games import router as games_router
 from routers.themes import router as themes_router
-
+from dev_db.create_db import create_db
 
 
 app = FastAPI(title="Chess LLM Backend")
@@ -26,6 +26,8 @@ app.add_middleware(
     allow_methods=["*"],  # Allows GET, POST, OPTIONS, etc.
     allow_headers=["*"],  # Allows all headers (Content-Type, Authorization, etc.)
 )
+
+create_db()
 
 @app.get("/")
 def read_root():
