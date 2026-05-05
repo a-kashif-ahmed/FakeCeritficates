@@ -3,9 +3,14 @@ from utils.get_parent_path import get_parent_path
 import sqlite3
 import os
 
-DB_PATH = get_parent_path() / "database" / "app.db"
+from pathlib import Path
+import sqlite3
 
-os.makedirs(DB_PATH.parent, exist_ok=True)
+# On Vercel, only /tmp is writable
+DB_PATH = Path("/tmp/app.db")
+
+
+
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
