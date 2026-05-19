@@ -47,7 +47,7 @@ class GameShowResponse(BaseModel):
 
 
 class GamesListRequest(BaseModel):
-    count: int = 10
+    count: int = None
 
 
 class GamesListResponse(BaseModel):
@@ -70,3 +70,22 @@ class BoardThemeDetailResponse(BaseModel):
 class PieceThemeDetailResponse(BaseModel):
     name: str
     pieces: Dict[str, str]
+
+
+class LLMDetails(BaseModel):
+    sevice_name : str
+    endpoint:str
+    api_key:str
+
+class UserDetails(BaseModel):
+    email : str
+    password : str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    

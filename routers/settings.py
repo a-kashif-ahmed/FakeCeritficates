@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from models import Settings
+from models import Settings, LLMDetails
 from utils.settings import get_settings, upsert_settings
 from config import USER_ID
 
@@ -38,3 +38,12 @@ async def update_settings(settings: Settings):
     upsert_settings(USER_ID, "game_settings", game_data)
     upsert_settings(USER_ID, "ai_settings", ai_data)
     return {"status": "updated"}
+
+@router.post("/providers")
+async def update_llm(llmDetails:LLMDetails):
+
+    
+    return{"status" : "hitted", "llm_details":llmDetails}
+
+
+

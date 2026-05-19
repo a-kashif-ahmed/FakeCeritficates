@@ -288,8 +288,8 @@ def list_games(count: int = 10) -> List[str]:
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id FROM games WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
-        (USER_ID, count)
+        "SELECT * FROM games ORDER BY created_at DESC LIMIT ?",
+        (count)
     )
     games = [row[0] for row in cursor.fetchall()]
     conn.close()

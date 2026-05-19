@@ -39,3 +39,4 @@ async def list_games_endpoint(req: GamesListRequest):
         return {"games": games}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
