@@ -3,8 +3,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))  # before any utils import
 
 from dev_db.create_db import create_db
+from dev_db.insert_sample_data import insert_sample_data
 create_db()
-
+insert_sample_data()
 # rest of your Flask/FastAPI app...
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware  # 1. Import the middleware
