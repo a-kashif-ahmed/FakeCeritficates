@@ -40,7 +40,7 @@ def read_root():
 app.include_router(settings_router)
 app.include_router(games_router)
 app.include_router(themes_router)
-app.include_router(use)
+
 
 if __name__ == "__main__":
     import uvicorn
