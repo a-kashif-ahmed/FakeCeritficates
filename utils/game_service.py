@@ -8,6 +8,14 @@ from utils.connect_db import get_connection
 from utils.settings import get_settings
 from utils.ai import create_ai_prompt, call_ai_api
 from utils.chess_utils import check_game_end
+from utils.stockfish_service import (
+    get_best_move,
+    analyze_user_move
+)
+
+
+from utils.coach_service import coach_user_move
+
 
 
 # ============================
@@ -50,153 +58,271 @@ def safe_push_allow_illegal(board: chess.Board, move: chess.Move) -> bool:
 # AI MOVE EXECUTION
 # ============================
 
+# def perform_ai_move(
+#     ai_info,
+#     board: chess.Board,
+#     history: List[str],
+#     ai_illegal: int,
+#     last_ply: int,
+#     game_id: str,
+#     settings: Dict[str, Any],
+#     user_is_white: bool,
+#     cursor,
+#     conn
+# ) -> Tuple[bool, Optional[str], Optional[str], str, str, int]:
+#     """
+#     Perform AI move.
+#     Allows illegal moves if ai_illegal == 1,
+#     but never allows king capture or broken FEN.
+#     """
+#     success = False
+#     ai_from = None
+#     ai_to = None
+#     ai_san = ""
+#     new_fen = board.fen()
+
+#     ai_moved_by = 0 if board.turn == chess.WHITE else 1
+
+#     # ============================
+#     # ILLEGAL-ALLOWED MODE
+#     # ============================
+#     # if ai_illegal == 1:
+#     #     prompt = create_ai_prompt(board.fen(), history)
+#     #     ai_move_dict = call_ai_api(
+#     #         ai_info['model_name'],
+#     #         ai_info['endpoint'],
+#     #         ai_info['api_key'],
+#     #         prompt
+#     #     )
+
+#     #     if ai_move_dict:
+#     #         fr = ai_move_dict.get('from', '')
+#     #         to_ = ai_move_dict.get('to', '')
+#     #         promote = ai_move_dict.get('promote')
+
+#     #         if len(fr) == 2 and len(to_) == 2:
+#     #             uci = fr + to_
+#     #             if promote:
+#     #                 uci += promote.lower()
+
+#     #             try:
+#     #                 move = chess.Move.from_uci(uci)
+#     #                 if safe_push_allow_illegal(board, move):
+#     #                     ai_from = fr
+#     #                     ai_to = to_
+#     #                     ai_san = uci
+#     #                     success = True
+#     #             except Exception:
+#     #                 pass
+
+#     # # ============================
+#     # # STRICT MODE (LEGAL ONLY)
+#     # # ============================
+#     # else:
+#     #     for _ in range(3):
+#     #         prompt = create_ai_prompt(board.fen(), history)
+#     #         ai_move_dict = call_ai_api(
+#     #             ai_info['model_name'],
+#     #             ai_info['endpoint'],
+#     #             ai_info['api_key'],
+#     #             prompt
+#     #         )
+
+#     #         if not ai_move_dict:
+#     #             continue
+
+#     #         uci = None
+#     #         turn_white = board.turn == chess.WHITE
+
+#     #         if 'castling' in ai_move_dict:
+#     #             c = ai_move_dict['castling'].upper()
+#     #             if c == 'O-O':
+#     #                 uci = 'e1g1' if turn_white else 'e8g8'
+#     #             elif c == 'O-O-O':
+#     #                 uci = 'e1c1' if turn_white else 'e8c8'
+#     #         else:
+#     #             fr = ai_move_dict.get('from', '')
+#     #             to_ = ai_move_dict.get('to', '')
+#     #             if len(fr) == 2 and len(to_) == 2:
+#     #                 uci = fr + to_
+#     #                 promote = ai_move_dict.get('promote')
+#     #                 if promote:
+#     #                     uci += promote.lower()
+
+#     #         if not uci:
+#     #             continue
+
+#     #         try:
+#     #             move = chess.Move.from_uci(uci)
+#     #             if move in board.legal_moves:
+#     #                 ai_san = board.san(move)
+#     #                 board.push(move)
+#     #                 ai_from = uci[:2]
+#     #                 ai_to = uci[2:4]
+#     #                 success = True
+#     #                 break
+#     #         except Exception:
+#     #             continue
+
+#     # ============================
+#     # FINAL FALLBACK (ALWAYS SAFE)
+#     # ============================
+#     if not success:
+#         legal_moves = list(board.legal_moves)
+#         if legal_moves:
+#             move = random.choice(legal_moves)
+#             ai_san = board.san(move)
+#             board.push(move)
+#             uci = move.uci()
+#             ai_from = uci[:2]
+#             ai_to = uci[2:4]
+#             success = True
+
+#     # ============================
+#     # COMMIT MOVE
+#     # ============================
+#     new_ply = last_ply + 1 if success else last_ply
+#     game_end = "no"
+
+#     if success:
+#         cursor.execute("""
+#             INSERT INTO moves (game_id, ply, moved_by, fen, san, created_at)
+#             VALUES (?, ?, ?, ?, ?, ?)
+#         """, (
+#             game_id,
+#             new_ply,
+#             ai_moved_by,
+#             board.fen(),
+#             ai_san,
+#             datetime.now().isoformat()
+#         ))
+
+#         new_fen = board.fen()
+#         game_end = check_game_end(
+#             board, settings, user_is_white, game_id, cursor, conn
+#         )
+
+#     return success, ai_from, ai_to, new_fen, game_end, new_ply
+
 def perform_ai_move(
     ai_info,
     board: chess.Board,
-    history: List[str],
-    ai_illegal: int,
-    last_ply: int,
-    game_id: str,
-    settings: Dict[str, Any],
-    user_is_white: bool,
+    history,
+    ai_illegal,
+    last_ply,
+    game_id,
+    settings,
+    user_is_white,
     cursor,
     conn
-) -> Tuple[bool, Optional[str], Optional[str], str, str, int]:
+):
     """
-    Perform AI move.
-    Allows illegal moves if ai_illegal == 1,
-    but never allows king capture or broken FEN.
+    Uses Stockfish instead of the LLM to generate the AI move.
+    The LLM is now only used for coaching.
     """
-    success = False
+
     ai_from = None
     ai_to = None
     ai_san = ""
-    new_fen = board.fen()
+    success = False
 
-    ai_moved_by = 0 if board.turn == chess.WHITE else 1
+    # ----------------------------
+    # Ask Stockfish
+    # ----------------------------
 
-    # ============================
-    # ILLEGAL-ALLOWED MODE
-    # ============================
-    if ai_illegal == 1:
-        prompt = create_ai_prompt(board.fen(), history)
-        ai_move_dict = call_ai_api(
-            ai_info['model_name'],
-            ai_info['endpoint'],
-            ai_info['api_key'],
-            prompt
-        )
+    result = get_best_move(board.fen())
 
-        if ai_move_dict:
-            fr = ai_move_dict.get('from', '')
-            to_ = ai_move_dict.get('to', '')
-            promote = ai_move_dict.get('promote')
+    best_move = result["move"]
 
-            if len(fr) == 2 and len(to_) == 2:
-                uci = fr + to_
-                if promote:
-                    uci += promote.lower()
+    if best_move is None:
 
-                try:
-                    move = chess.Move.from_uci(uci)
-                    if safe_push_allow_illegal(board, move):
-                        ai_from = fr
-                        ai_to = to_
-                        ai_san = uci
-                        success = True
-                except Exception:
-                    pass
+        legal = list(board.legal_moves)
 
-    # ============================
-    # STRICT MODE (LEGAL ONLY)
-    # ============================
-    else:
-        for _ in range(3):
-            prompt = create_ai_prompt(board.fen(), history)
-            ai_move_dict = call_ai_api(
-                ai_info['model_name'],
-                ai_info['endpoint'],
-                ai_info['api_key'],
-                prompt
+        if not legal:
+
+            return (
+                False,
+                None,
+                None,
+                board.fen(),
+                "no",
+                last_ply
             )
 
-            if not ai_move_dict:
-                continue
+        move = random.choice(legal)
 
-            uci = None
-            turn_white = board.turn == chess.WHITE
+    else:
 
-            if 'castling' in ai_move_dict:
-                c = ai_move_dict['castling'].upper()
-                if c == 'O-O':
-                    uci = 'e1g1' if turn_white else 'e8g8'
-                elif c == 'O-O-O':
-                    uci = 'e1c1' if turn_white else 'e8c8'
-            else:
-                fr = ai_move_dict.get('from', '')
-                to_ = ai_move_dict.get('to', '')
-                if len(fr) == 2 and len(to_) == 2:
-                    uci = fr + to_
-                    promote = ai_move_dict.get('promote')
-                    if promote:
-                        uci += promote.lower()
+        move = chess.Move.from_uci(best_move)
 
-            if not uci:
-                continue
+    # ----------------------------
+    # Play move
+    # ----------------------------
 
-            try:
-                move = chess.Move.from_uci(uci)
-                if move in board.legal_moves:
-                    ai_san = board.san(move)
-                    board.push(move)
-                    ai_from = uci[:2]
-                    ai_to = uci[2:4]
-                    success = True
-                    break
-            except Exception:
-                continue
+    ai_san = board.san(move)
 
-    # ============================
-    # FINAL FALLBACK (ALWAYS SAFE)
-    # ============================
-    if not success:
-        legal_moves = list(board.legal_moves)
-        if legal_moves:
-            move = random.choice(legal_moves)
-            ai_san = board.san(move)
-            board.push(move)
-            uci = move.uci()
-            ai_from = uci[:2]
-            ai_to = uci[2:4]
-            success = True
+    board.push(move)
 
-    # ============================
-    # COMMIT MOVE
-    # ============================
-    new_ply = last_ply + 1 if success else last_ply
-    game_end = "no"
+    success = True
 
-    if success:
-        cursor.execute("""
-            INSERT INTO moves (game_id, ply, moved_by, fen, san, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (
+    uci = move.uci()
+
+    ai_from = uci[:2]
+
+    ai_to = uci[2:4]
+
+    ai_moved_by = 0 if not user_is_white else 1
+
+    new_ply = last_ply + 1
+
+    cursor.execute(
+        """
+        INSERT INTO moves
+        (
+            game_id,
+            ply,
+            moved_by,
+            fen,
+            san,
+            created_at
+        )
+        VALUES
+        (
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?
+        )
+        """,
+        (
             game_id,
             new_ply,
             ai_moved_by,
             board.fen(),
             ai_san,
             datetime.now().isoformat()
-        ))
-
-        new_fen = board.fen()
-        game_end = check_game_end(
-            board, settings, user_is_white, game_id, cursor, conn
         )
+    )
 
-    return success, ai_from, ai_to, new_fen, game_end, new_ply
+    game_end = check_game_end(
+        board,
+        settings,
+        user_is_white,
+        game_id,
+        cursor,
+        conn
+    )
 
-
+    return (
+        success,
+        ai_from,
+        ai_to,
+        board.fen(),
+        game_end,
+        new_ply
+    )
 # ============================
 # GAME CREATION / STATE
 # ============================
@@ -418,8 +544,16 @@ def process_move(game_id: str, from_square: str, to_square: str) -> Dict[str, An
         conn.close()
         raise ValueError("Illegal move")
     # Execute user move
+
+    before_fen = board.fen()
+
     san = board.san(move)
+
     board.push(move)
+    analysis = analyze_user_move(
+    before_fen,
+    move.uci()
+)
     new_ply = last_ply + 1
     user_moved_by = 0 if user_is_white else 1
     cursor.execute("""
@@ -446,6 +580,14 @@ def process_move(game_id: str, from_square: str, to_square: str) -> Dict[str, An
     history = [row[0] for row in cursor.fetchall()]
     opp_role = "model_b" if user_is_white else "model_a"
     ai_info = get_ai_info(cursor, game_id, opp_role)
+    coach_feedback = None
+
+    if ai_info:
+        coach_feedback = coach_user_move(
+            ai_info,
+            analysis
+        )
+    #
     if ai_info:
         success, ai_from_, ai_to_, new_fen_, game_end_, new_ply_ = perform_ai_move(
             ai_info, board, history, ai_illegal, new_ply, game_id, settings, user_is_white, cursor, conn
@@ -457,8 +599,27 @@ def process_move(game_id: str, from_square: str, to_square: str) -> Dict[str, An
     conn.commit()
     conn.close()
     return {
-        "ai_from": ai_from,
-        "ai_to": ai_to,
-        "fen": new_fen,
-        "game_end": game_end
-    }
+
+    "ai_from": ai_from,
+
+    "ai_to": ai_to,
+
+    "fen": new_fen,
+
+    "game_end": game_end,
+
+    "coach_feedback": coach_feedback,
+
+    "classification": analysis["classification"],
+
+    "best_move": analysis["best_move"],
+
+    "played_move": analysis["played_move"],
+
+    "centipawn_loss": analysis["cp_loss"],
+
+    "evaluation_before": analysis["before_eval"],
+
+    "evaluation_after": analysis["after_eval"]
+
+}

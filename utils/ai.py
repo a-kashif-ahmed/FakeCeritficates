@@ -78,3 +78,36 @@ def call_ai_api(model_name: str, endpoint: str, api_key: str, prompt: str) -> Op
         except Exception:
             return None
     return None
+
+def call_coach_api(model_name: str, endpoint: str, api_key: str, prompt: str):
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "model": model_name,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "temperature": 0.5
+    }
+
+    response = requests.post(
+        endpoint,
+        headers=headers,
+        json=payload
+    )
+
+    if response.status_code != 200:
+        return None
+
+    try:
+        return response.json()["choices"][0]["message"]["content"]
+
+    except Exception:
+        return None

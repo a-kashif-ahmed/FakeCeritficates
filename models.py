@@ -22,12 +22,29 @@ class MoveRequest(BaseModel):
     from_square: str
     to_square: str
 
+
 class MoveResponse(BaseModel):
     ai_from: Optional[str] = None
     ai_to: Optional[str] = None
+
     fen: str
     game_end: str
 
+    # -------- Coach --------
+    coach_feedback: Optional[str] = None
+
+    # -------- Analysis --------
+    classification: Optional[str] = None
+
+    best_move: Optional[str] = None
+
+    played_move: Optional[str] = None
+
+    centipawn_loss: Optional[int] = None
+
+    evaluation_before: Optional[int] = None
+
+    evaluation_after: Optional[int] = None
 
 class GameCreateResponse(BaseModel):
     game_id: str

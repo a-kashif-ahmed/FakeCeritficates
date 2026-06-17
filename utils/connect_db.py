@@ -2,15 +2,18 @@ from utils.get_parent_path import get_parent_path
 
 import sqlite3
 import os
-
 from pathlib import Path
-import sqlite3
-# DB_PATH = get_parent_path() / "database" / "app.db" 
-# os.makedirs(DB_PATH.parent, exist_ok=True) 
 
-DB_PATH = "/tmp/app.db"
+# Use environment variable to detect environment
+IS_VERCEL = os.environ.get("VERCEL")  # Vercel sets this automatically
 
-def get_connection(): 
-    conn = sqlite3.connect(DB_PATH) 
-    conn.row_factory = sqlite3.Row 
+if IS_VERCEL:
+    DB_PATH = "/tmp/app.db"
+else:
+    DB_PATH = Path(__file__).parent.parent / "database" / "app.db"
+    os.makedirs(DB_PATH.parent, exist_ok=True)
+
+def get_connection():
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
     return conn
