@@ -1,6 +1,7 @@
 import os
 import subprocess
 import chess
+import time
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENGINE_PATH = os.path.join(BASE_DIR, "engines", "stockfish")
@@ -34,10 +35,25 @@ class StockfishEngine:
         self.process.stdin.write(command + "\n")
         self.process.stdin.flush()
 
-    def wait_for(self, text):
+    
+
+    def wait_for(self, text, timeout=5):
+        start = time.time()
 
         while True:
-            line = self.process.stdout.readline().strip()
+            if time.time() - start > timeout:
+                raise RuntimeError(f"Timed out waiting for {text}")
+
+            if self.process.poll() is not None:
+                stderr = self.process.stderr.read()
+                raise RuntimeError(
+                    f"Stockfish exited with code {self.process.returncode}\n"
+                    f"STDERR:\n{stderr}"
+                )
+
+            line = self.process.stdout.readline()
+
+            print("ENGINE:", line)
 
             if text in line:
                 return
@@ -84,17 +100,15 @@ class StockfishEngine:
 
 _engine = None
 
-
 def get_engine():
     global _engine
 
     if _engine is None:
         print("Starting Stockfish...")
+
         _engine = StockfishEngine()
 
     return _engine
-
-engine = get_engine()
 
 print("ENGINE PATH:", ENGINE_PATH)
 print("EXISTS:", os.path.exists(ENGINE_PATH))
@@ -143,7 +157,7 @@ def classify_move(cp_loss):
 
 def get_best_move(fen):
 
-    move, evaluation = engine.get_best_move(fen)
+    move, evaluation = get_engine().get_best_move(fen)
 
     return {
 
@@ -162,7 +176,7 @@ def analyze_user_move(before_fen, user_move):
 
     board = chess.Board(before_fen)
 
-    best_move, best_eval = engine.get_best_move(before_fen)
+    best_move, best_eval = get_engine().get_best_move(before_fen)
 
     best_cp = _score(best_eval)
 
@@ -170,7 +184,7 @@ def analyze_user_move(before_fen, user_move):
 
     after_fen = board.fen()
 
-    _, played_eval = engine.get_best_move(after_fen)
+    _, played_eval = get_engine().get_best_move(after_fen)
 
     played_cp = _score(played_eval)
 
