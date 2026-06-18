@@ -82,9 +82,23 @@ class StockfishEngine:
         return best, evaluation
 
 
-engine = StockfishEngine()
+_engine = None
 
 
+def get_engine():
+    global _engine
+
+    if _engine is None:
+        print("Starting Stockfish...")
+        _engine = StockfishEngine()
+
+    return _engine
+
+engine = get_engine()
+
+print("ENGINE PATH:", ENGINE_PATH)
+print("EXISTS:", os.path.exists(ENGINE_PATH))
+print("PID:", self.process.pid)
 # -------------------------------------------------------
 # Helpers
 # -------------------------------------------------------
