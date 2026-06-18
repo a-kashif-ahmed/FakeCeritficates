@@ -19,6 +19,7 @@ class StockfishEngine:
             text=True,
             bufsize=1,
         )
+        print("PID:", self.process.pid)
 
         self.send("uci")
         self.wait_for("uciok")
@@ -37,19 +38,34 @@ class StockfishEngine:
 
     
 
+    
+
     def wait_for(self, text, timeout=5):
+
         start = time.time()
 
         while True:
-            if time.time() - start > timeout:
-                raise RuntimeError(f"Timed out waiting for {text}")
 
             if self.process.poll() is not None:
                 stderr = self.process.stderr.read()
+                stdout = self.process.stdout.read()
+
                 raise RuntimeError(
-                    f"Stockfish exited with code {self.process.returncode}\n"
-                    f"STDERR:\n{stderr}"
+                    f"""
+    Stockfish exited.
+
+    Return code: {self.process.returncode}
+
+    STDOUT:
+    {stdout}
+
+    STDERR:
+    {stderr}
+    """
                 )
+
+            if time.time() - start > timeout:
+                raise RuntimeError(f"Timed out waiting for {text}")
 
             line = self.process.stdout.readline()
 
@@ -112,7 +128,7 @@ def get_engine():
 
 print("ENGINE PATH:", ENGINE_PATH)
 print("EXISTS:", os.path.exists(ENGINE_PATH))
-print("PID:", self.process.pid)
+
 # -------------------------------------------------------
 # Helpers
 # -------------------------------------------------------
