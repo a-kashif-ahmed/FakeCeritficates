@@ -1,0 +1,40 @@
+name: Build Stockfish
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git
+
+      - name: Clone Stockfish
+        run: |
+          git clone https://github.com/official-stockfish/Stockfish.git
+
+      - name: Build
+        run: |
+          cd Stockfish/src
+          make build ARCH=x86-64
+
+      - name: Strip binary
+        run: |
+          strip Stockfish/src/stockfish
+
+      - name: Copy binary
+        run: |
+          mkdir -p engines
+          cp Stockfish/src/stockfish engines/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stockfish-linux
+          path: engines/stockfish
