@@ -5,10 +5,8 @@ from stockfish import Stockfish
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-if platform.system() == "Windows":
-    ENGINE_PATH = os.path.join(BASE_DIR, "engines", "stockfish.exe")
-else:
-    ENGINE_PATH = os.path.join(BASE_DIR, "engines", "stockfish")
+
+ENGINE_PATH = os.path.join(BASE_DIR, "engines", "stockfish")
 
 stockfish = Stockfish(path=ENGINE_PATH)
 
