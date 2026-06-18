@@ -1,16 +1,29 @@
 import chess
+import os
+import platform
 from stockfish import Stockfish
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+if platform.system() == "Windows":
+    ENGINE_PATH = os.path.join(BASE_DIR, "engines", "stockfish.exe")
+else:
+    ENGINE_PATH = os.path.join(BASE_DIR, "engines", "stockfish")
+
+stockfish = Stockfish(path=ENGINE_PATH)
+
+stockfish.set_depth(15)
+stockfish.set_skill_level(20)
 # -------------------------------------------------------
 # Configure Stockfish
 # -------------------------------------------------------
 
-stockfish = Stockfish(
-    path="engines/stockfish.exe"
-)
+# stockfish = Stockfish(
+#     path="engines/stockfish.exe"
+# )
 
-stockfish.set_depth(15)
-stockfish.set_skill_level(20)
+# stockfish.set_depth(15)
+# stockfish.set_skill_level(20)
 
 
 # -------------------------------------------------------
