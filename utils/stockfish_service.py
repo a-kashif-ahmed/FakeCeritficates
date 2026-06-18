@@ -1,27 +1,88 @@
-import chess
 import os
-import platform
-from stockfish import Stockfish
+import subprocess
+import chess
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-
 ENGINE_PATH = os.path.join(BASE_DIR, "engines", "stockfish")
 
-stockfish = Stockfish(path=ENGINE_PATH)
 
-stockfish.set_depth(15)
-stockfish.set_skill_level(20)
-# -------------------------------------------------------
-# Configure Stockfish
-# -------------------------------------------------------
+class StockfishEngine:
 
-# stockfish = Stockfish(
-#     path="engines/stockfish.exe"
-# )
+    def __init__(self):
 
-# stockfish.set_depth(15)
-# stockfish.set_skill_level(20)
+        self.process = subprocess.Popen(
+            [ENGINE_PATH],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
+
+        self.send("uci")
+        self.wait_for("uciok")
+
+        self.send("isready")
+        self.wait_for("readyok")
+
+        self.send("setoption name Skill Level value 20")
+        self.send("isready")
+        self.wait_for("readyok")
+
+    def send(self, command):
+
+        self.process.stdin.write(command + "\n")
+        self.process.stdin.flush()
+
+    def wait_for(self, text):
+
+        while True:
+            line = self.process.stdout.readline().strip()
+
+            if text in line:
+                return
+
+    def get_best_move(self, fen, depth=15):
+
+        self.send(f"position fen {fen}")
+        self.send(f"go depth {depth}")
+
+        best = None
+        evaluation = None
+
+        while True:
+
+            line = self.process.stdout.readline().strip()
+
+            if line.startswith("info"):
+
+                if " score cp " in line:
+
+                    cp = int(line.split(" score cp ")[1].split()[0])
+
+                    evaluation = {
+                        "type": "cp",
+                        "value": cp
+                    }
+
+                elif " score mate " in line:
+
+                    mate = int(line.split(" score mate ")[1].split()[0])
+
+                    evaluation = {
+                        "type": "mate",
+                        "value": mate
+                    }
+
+            elif line.startswith("bestmove"):
+
+                best = line.split()[1]
+                break
+
+        return best, evaluation
+
+
+engine = StockfishEngine()
 
 
 # -------------------------------------------------------
@@ -29,13 +90,9 @@ stockfish.set_skill_level(20)
 # -------------------------------------------------------
 
 def _score(eval_dict):
-    """
-    Converts Stockfish evaluation to centipawns.
 
-    cp -> actual value
-
-    mate -> huge score
-    """
+    if eval_dict is None:
+        return 0
 
     if eval_dict["type"] == "cp":
         return eval_dict["value"]
@@ -46,7 +103,7 @@ def _score(eval_dict):
     return 0
 
 
-def classify_move(cp_loss: int):
+def classify_move(cp_loss):
 
     if cp_loss <= 20:
         return "Brilliant"
@@ -70,17 +127,16 @@ def classify_move(cp_loss: int):
 # Engine Move
 # -------------------------------------------------------
 
-def get_best_move(fen: str):
+def get_best_move(fen):
 
-    stockfish.set_fen_position(fen)
-
-    best_move = stockfish.get_best_move()
-
-    evaluation = stockfish.get_evaluation()
+    move, evaluation = engine.get_best_move(fen)
 
     return {
-        "move": best_move,
+
+        "move": move,
+
         "evaluation": evaluation
+
     }
 
 
@@ -88,28 +144,19 @@ def get_best_move(fen: str):
 # Analyse User Move
 # -------------------------------------------------------
 
-def analyze_user_move(before_fen: str, user_move: str):
+def analyze_user_move(before_fen, user_move):
 
     board = chess.Board(before_fen)
 
-    # Engine best move BEFORE user move
-    stockfish.set_fen_position(before_fen)
-
-    best_move = stockfish.get_best_move()
-
-    best_eval = stockfish.get_evaluation()
+    best_move, best_eval = engine.get_best_move(before_fen)
 
     best_cp = _score(best_eval)
 
-    # Play user's move
     board.push(chess.Move.from_uci(user_move))
 
     after_fen = board.fen()
 
-    # Evaluate AFTER user's move
-    stockfish.set_fen_position(after_fen)
-
-    played_eval = stockfish.get_evaluation()
+    _, played_eval = engine.get_best_move(after_fen)
 
     played_cp = _score(played_eval)
 
