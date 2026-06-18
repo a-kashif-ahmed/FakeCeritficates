@@ -35,13 +35,6 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    from utils.stockfish_service import stockfish_service
-
-    fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-
-    print(stockfish_service.get_best_move(fen))
-    print(stockfish_service.get_top_moves(fen))
-    print(stockfish_service.evaluate(fen))
     return {"message": "Hello, FastAPI!"}
 
 
