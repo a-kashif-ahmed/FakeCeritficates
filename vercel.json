@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "buildCommand": "chmod +x engines/stockfish",
   "builds": [
     {
       "src": "app.py",
@@ -12,5 +11,10 @@
       "src": "/(.*)",
       "dest": "app.py"
     }
-  ]
+  ],
+  "functions": {
+    "app.py": {
+      "maxDuration": 10
+    }
+  }
 }
