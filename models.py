@@ -30,7 +30,7 @@ class MoveResponse(BaseModel):
     fen: str
     game_end: str
 
-    # -------- Coach --------
+    
     coach_feedback: Optional[str] = None
 
     # -------- Analysis --------
