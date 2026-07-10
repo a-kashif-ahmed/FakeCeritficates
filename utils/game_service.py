@@ -10,6 +10,7 @@ from utils.ai import create_ai_prompt, call_ai_api
 from utils.chess_utils import check_game_end
 from utils.stockfish_service import (
     get_best_move,
+    get_top3_moves,
     analyze_user_move
 )
 
@@ -204,6 +205,136 @@ def safe_push_allow_illegal(board: chess.Board, move: chess.Move) -> bool:
 
 #     return success, ai_from, ai_to, new_fen, game_end, new_ply
 
+# def perform_ai_move(
+#     ai_info,
+#     board: chess.Board,
+#     history,
+#     ai_illegal,
+#     last_ply,
+#     game_id,
+#     settings,
+#     user_is_white,
+#     cursor,
+#     conn
+# ):
+#     """
+#     Uses Stockfish instead of the LLM to generate the AI move.
+#     The LLM is now only used for coaching.
+#     """
+
+#     ai_from = None
+#     ai_to = None
+#     ai_san = ""
+#     success = False
+
+#     # ----------------------------
+#     # Ask Stockfish
+#     # ----------------------------
+
+#     result = get_top3_moves(board.fen())
+
+#     best_move = result["top3"]
+
+#     if best_move is None:
+
+#         legal = list(board.legal_moves)
+
+#         if not legal:
+
+#             return (
+#                 False,
+#                 None,
+#                 None,
+#                 board.fen(),
+#                 "no",
+#                 last_ply
+#             )
+
+#         move = random.choice(legal)
+
+#     else:
+
+#         prompt = create_ai_prompt(
+#             board.fen(),
+#             history,
+#             candidate_moves
+#         )
+
+#         response = call_ai_api(
+#             ai_info["model_name"],
+#             ai_info["endpoint"],
+#             ai_info["api_key"],
+#             prompt
+#         )
+
+#     # ----------------------------
+#     # Play move
+#     # ----------------------------
+
+#     ai_san = board.san(move)
+
+#     board.push(move)
+
+#     success = True
+
+#     uci = move.uci()
+
+#     ai_from = uci[:2]
+
+#     ai_to = uci[2:4]
+
+#     ai_moved_by = 0 if not user_is_white else 1
+
+#     new_ply = last_ply + 1
+
+#     cursor.execute(
+#         """
+#         INSERT INTO moves
+#         (
+#             game_id,
+#             ply,
+#             moved_by,
+#             fen,
+#             san,
+#             created_at
+#         )
+#         VALUES
+#         (
+#             ?,
+#             ?,
+#             ?,
+#             ?,
+#             ?,
+#             ?
+#         )
+#         """,
+#         (
+#             game_id,
+#             new_ply,
+#             ai_moved_by,
+#             board.fen(),
+#             ai_san,
+#             datetime.now().isoformat()
+#         )
+#     )
+
+#     game_end = check_game_end(
+#         board,
+#         settings,
+#         user_is_white,
+#         game_id,
+#         cursor,
+#         conn
+#     )
+
+#     return (
+#         success,
+#         ai_from,
+#         ai_to,
+#         board.fen(),
+#         game_end,
+#         new_ply
+#     )
 def perform_ai_move(
     ai_info,
     board: chess.Board,
@@ -216,30 +347,25 @@ def perform_ai_move(
     cursor,
     conn
 ):
-    """
-    Uses Stockfish instead of the LLM to generate the AI move.
-    The LLM is now only used for coaching.
-    """
 
     ai_from = None
     ai_to = None
     ai_san = ""
     success = False
 
-    # ----------------------------
-    # Ask Stockfish
-    # ----------------------------
+    # -----------------------------------
+    # Ask Stockfish for Top 3
+    # -----------------------------------
 
-    result = get_best_move(board.fen())
+    result = get_top3_moves(board.fen())
 
-    best_move = result["move"]
+    candidate_moves = result["top3"]
 
-    if best_move is None:
+    if not candidate_moves:
 
         legal = list(board.legal_moves)
 
         if not legal:
-
             return (
                 False,
                 None,
@@ -253,11 +379,37 @@ def perform_ai_move(
 
     else:
 
-        move = chess.Move.from_uci(best_move)
+        prompt = create_ai_prompt(
+            board.fen(),
+            history,
+            candidate_moves
+        )
 
-    # ----------------------------
+        response = call_ai_api(
+            ai_info["model_name"],
+            ai_info["endpoint"],
+            ai_info["api_key"],
+            prompt
+        )
+
+        chosen = None
+
+        if response:
+
+            move_str = response.get("move")
+
+            if move_str in candidate_moves:
+                chosen = move_str
+
+        # Fallback to Stockfish's best move
+        if chosen is None:
+            chosen = candidate_moves[0]
+
+        move = chess.Move.from_uci(chosen)
+
+    # -----------------------------------
     # Play move
-    # ----------------------------
+    # -----------------------------------
 
     ai_san = board.san(move)
 
@@ -268,7 +420,6 @@ def perform_ai_move(
     uci = move.uci()
 
     ai_from = uci[:2]
-
     ai_to = uci[2:4]
 
     ai_moved_by = 0 if not user_is_white else 1
@@ -323,6 +474,7 @@ def perform_ai_move(
         game_end,
         new_ply
     )
+
 # ============================
 # GAME CREATION / STATE
 # ============================

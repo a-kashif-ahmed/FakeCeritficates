@@ -73,6 +73,47 @@ class StockfishEngine:
 
             if text in line:
                 return
+    def get_top3_moves(self, fen, depth=15):
+
+        self.send("setoption name MultiPV value 3")
+
+        self.send(f"position fen {fen}")
+        self.send(f"go depth {depth}")
+
+        top_moves = {}
+
+        while True:
+
+            line = self.process.stdout.readline().strip()
+
+            if line.startswith("info") and " multipv " in line:
+
+                try:
+
+                    pv = int(line.split(" multipv ")[1].split()[0])
+
+                    if pv > 3:
+                        continue
+
+                    if " pv " not in line:
+                        continue
+
+                    move = line.split(" pv ")[1].split()[0]
+
+                    top_moves[pv] = move
+
+                except Exception:
+                    pass
+
+            elif line.startswith("bestmove"):
+
+                break
+
+        return [
+            top_moves.get(1),
+            top_moves.get(2),
+            top_moves.get(3)
+        ]
 
     def get_best_move(self, fen, depth=15):
 
@@ -171,18 +212,15 @@ def classify_move(cp_loss):
 # Engine Move
 # -------------------------------------------------------
 
-def get_best_move(fen):
+def get_top3_moves(fen):
 
-    move, evaluation = get_engine().get_best_move(fen)
+    moves = get_engine().get_top3_moves(fen)
 
     return {
-
-        "move": move,
-
-        "evaluation": evaluation
-
+        "top3": [
+            m for m in moves if m
+        ]
     }
-
 
 # -------------------------------------------------------
 # Analyse User Move
