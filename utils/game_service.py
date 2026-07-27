@@ -509,8 +509,9 @@ def create_game(user_id: int = USER_ID) -> Dict[str, Any]:
     user_color_setting = settings.get('user_color', 2)
     user_is_white = random.choice([True, False]) if user_color_setting == 2 else user_color_setting == 0
     user_color = 0 if user_is_white else 1
-
-    watch_only = settings.get('watch_only', 0) == 1
+    print(settings)
+    
+    watch_only = 0
     play_till = settings.get('play_till', 1)
     ai_illegal = settings.get('ai_illegal', 1)
 

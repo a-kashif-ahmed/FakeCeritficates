@@ -222,6 +222,12 @@ def get_top3_moves(fen):
         ]
     }
 
+def get_best_move(fen ,depth=15):
+    with _engine:
+        best, evaluation = get_engine().get_best_move(fen)
+    return best, evaluation
+
+
 # -------------------------------------------------------
 # Analyse User Move
 # -------------------------------------------------------
