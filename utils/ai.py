@@ -28,10 +28,10 @@ Candidate moves:
 
 Return ONLY valid JSON in this format:
 
-{
-    "move": "e2e4",
-    "reason": "One short sentence."
-}
+{{
+    "move":"e2e4",
+    "reason":"One short sentence."
+}}
 
 The value of "move" MUST be exactly one of the candidate moves above.
     """
