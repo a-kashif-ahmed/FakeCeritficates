@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from models import MoveRequest, MoveResponse, GameCreateResponse, GameShowResponse, GamesListRequest, GamesListResponse
-from utils.game_service import create_game, process_move, get_game_state, list_games
+from utils.game_service import create_game, process_move, get_game_state, list_games, step_ai_game
 
 router = APIRouter(prefix="/api/v1/games", tags=["games"])
 
@@ -16,6 +16,17 @@ async def create_game_endpoint():
 async def make_move(game_id: str, move_req: MoveRequest):
     try:
         result = process_move(game_id, move_req.from_square, move_req.to_square)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{game_id}/step", response_model=MoveResponse)
+async def step_game(game_id: str):
+    """Advance an AI vs AI (watch-only) game by one ply."""
+    try:
+        result = step_ai_game(game_id)
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -39,4 +50,3 @@ async def list_games_endpoint(req: GamesListRequest):
         return {"games": games}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-

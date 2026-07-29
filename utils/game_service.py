@@ -353,6 +353,11 @@ def perform_ai_move(
     ai_san = ""
     success = False
 
+    # Capture whose turn it is BEFORE the move is pushed. This must drive
+    # moved_by (not user_is_white), otherwise AI-vs-AI games log every move
+    # under the same color since both sides are AI-controlled.
+    mover_is_white = board.turn == chess.WHITE
+
     # -----------------------------------
     # Ask Stockfish for Top 3
     # -----------------------------------
@@ -422,7 +427,7 @@ def perform_ai_move(
     ai_from = uci[:2]
     ai_to = uci[2:4]
 
-    ai_moved_by = 0 if not user_is_white else 1
+    ai_moved_by = 0 if mover_is_white else 1
 
     new_ply = last_ply + 1
 
@@ -536,8 +541,9 @@ def create_game(user_id: int = USER_ID) -> Dict[str, Any]:
     board = chess.Board()
     ai_from = None
     ai_to = None
-    if not watch_only and not user_is_white:
-        # AI (white, model_a) moves first
+    if watch_only or not user_is_white:
+        # AI (white, model_a) moves first. In watch-only (AI vs AI) mode,
+        # White is always AI-controlled regardless of user_is_white.
         history = []
         ai_info = get_ai_info(cursor, game_id, "model_a")
         if ai_info:
@@ -558,6 +564,78 @@ def create_game(user_id: int = USER_ID) -> Dict[str, Any]:
         "user_color": "white" if user_is_white else "black",
         "from_square": ai_from,
         "to_square": ai_to
+    }
+
+
+def step_ai_game(game_id: str) -> Dict[str, Any]:
+    """
+    Advance a watch-only (AI vs AI) game by exactly one ply: whichever
+    color's turn it currently is gets an AI move. This is the missing
+    piece that lets AI-vs-AI games progress after creation, since
+    process_move() intentionally rejects watch-only games.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+
+    cursor.execute("SELECT user_id, status FROM games WHERE id = ?", (game_id,))
+    game_row = cursor.fetchone()
+    if not game_row or game_row[1] != "active":
+        conn.close()
+        raise ValueError("Game not found or not active")
+    user_id = game_row[0]
+    settings = get_settings(user_id)
+
+    cursor.execute("""
+        SELECT user_color, watch_only, play_till, ai_illegal
+        FROM game_settings_snapshot WHERE game_id = ?
+    """, (game_id,))
+    snap_row = cursor.fetchone()
+    if not snap_row:
+        conn.close()
+        raise ValueError("No game settings")
+    user_color, watch_only, play_till, ai_illegal = map(int, snap_row)
+    if watch_only != 1:
+        conn.close()
+        raise ValueError("Game is not in watch-only (AI vs AI) mode")
+    user_is_white = user_color == 0
+
+    cursor.execute("""
+        SELECT ply, fen FROM moves
+        WHERE game_id = ? ORDER BY ply DESC LIMIT 1
+    """, (game_id,))
+    last_row = cursor.fetchone()
+    if last_row:
+        last_ply, last_fen = last_row
+        board = chess.Board(last_fen)
+    else:
+        last_ply = 0
+        board = chess.Board()
+
+    cursor.execute("SELECT san FROM moves WHERE game_id = ? ORDER BY ply ASC", (game_id,))
+    history = [row[0] for row in cursor.fetchall()]
+
+    role = "model_a" if board.turn == chess.WHITE else "model_b"
+    ai_info = get_ai_info(cursor, game_id, role)
+    if not ai_info:
+        conn.close()
+        raise ValueError(f"No AI assigned for role '{role}'")
+
+    success, ai_from, ai_to, new_fen, game_end, new_ply = perform_ai_move(
+        ai_info, board, history, ai_illegal, last_ply, game_id, settings, user_is_white, cursor, conn
+    )
+
+    if game_end != "no":
+        cursor.execute("UPDATE games SET status = 'ended' WHERE id = ?", (game_id,))
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "ai_from": ai_from,
+        "ai_to": ai_to,
+        "fen": new_fen,
+        "game_end": game_end
     }
 
 
