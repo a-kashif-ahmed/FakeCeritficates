@@ -511,7 +511,7 @@ def create_game(user_id: int = USER_ID) -> Dict[str, Any]:
     user_color = 0 if user_is_white else 1
     print(settings)
     
-    watch_only = 0
+    watch_only = settings.get('watch_only', 0) == 1 
     play_till = settings.get('play_till', 1)
     ai_illegal = settings.get('ai_illegal', 1)
 
