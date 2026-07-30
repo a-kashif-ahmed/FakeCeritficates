@@ -499,6 +499,60 @@ def get_ai_info(cursor, game_id: str, role: str) -> Optional[Dict[str, str]]:
     return dict(row) if row else None
 
 
+def _run_ai_vs_ai_to_completion(
+    board: chess.Board,
+    history: List[str],
+    ai_illegal,
+    last_ply: int,
+    game_id: str,
+    settings: Dict[str, Any],
+    user_is_white: bool,
+    cursor,
+    conn
+) -> Tuple[Optional[str], Optional[str], str, str, int]:
+    """
+    Loop AI moves (alternating model_a/model_b) until the game ends.
+    Watch-only games have no user turns at all, so a single perform_ai_move
+    call per HTTP request is not enough - the whole game must be played out
+    here rather than requiring the caller to poll one ply at a time.
+    A ply cap is kept as a safety net against a runaway/non-terminating loop.
+    """
+    MAX_PLIES = 500
+
+    first_from = None
+    first_to = None
+    game_end = "no"
+    ply = last_ply
+
+    while game_end == "no" and ply < MAX_PLIES:
+        role = "model_a" if board.turn == chess.WHITE else "model_b"
+        ai_info = get_ai_info(cursor, game_id, role)
+        if not ai_info:
+            break
+
+        success, ai_from, ai_to, new_fen, game_end, ply = perform_ai_move(
+            ai_info, board, history, ai_illegal, ply, game_id, settings, user_is_white, cursor, conn
+        )
+        if not success:
+            break
+
+        if first_from is None:
+            first_from, first_to = ai_from, ai_to
+
+        # Keep history in sync for the next prompt (last move's SAN).
+        cursor.execute(
+            "SELECT san FROM moves WHERE game_id = ? AND ply = ?", (game_id, ply)
+        )
+        row = cursor.fetchone()
+        if row:
+            history.append(row[0])
+
+    if game_end != "no":
+        cursor.execute("UPDATE games SET status = 'ended' WHERE id = ?", (game_id,))
+
+    return first_from, first_to, board.fen(), game_end, ply
+
+
 def create_game(user_id: int = USER_ID) -> Dict[str, Any]:
     settings = get_settings(user_id)
     conn = get_connection()
@@ -541,9 +595,14 @@ def create_game(user_id: int = USER_ID) -> Dict[str, Any]:
     board = chess.Board()
     ai_from = None
     ai_to = None
-    if watch_only or not user_is_white:
-        # AI (white, model_a) moves first. In watch-only (AI vs AI) mode,
-        # White is always AI-controlled regardless of user_is_white.
+    if watch_only:
+        # AI vs AI: there is no user turn at any point, so play the whole
+        # game out now rather than stopping after White's opening move.
+        ai_from, ai_to, new_fen, game_end, _ = _run_ai_vs_ai_to_completion(
+            board, [], ai_illegal, 0, game_id, settings, user_is_white, cursor, conn
+        )
+    elif not user_is_white:
+        # AI (white, model_a) moves first; user (black) responds via /move.
         history = []
         ai_info = get_ai_info(cursor, game_id, "model_a")
         if ai_info:
@@ -569,10 +628,10 @@ def create_game(user_id: int = USER_ID) -> Dict[str, Any]:
 
 def step_ai_game(game_id: str) -> Dict[str, Any]:
     """
-    Advance a watch-only (AI vs AI) game by exactly one ply: whichever
-    color's turn it currently is gets an AI move. This is the missing
-    piece that lets AI-vs-AI games progress after creation, since
-    process_move() intentionally rejects watch-only games.
+    Resume/advance a watch-only (AI vs AI) game, playing it out to
+    completion. Mainly useful if a game somehow stalled mid-way (e.g. the
+    server restarted between moves); a freshly created watch-only game is
+    already finished by create_game().
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -615,18 +674,9 @@ def step_ai_game(game_id: str) -> Dict[str, Any]:
     cursor.execute("SELECT san FROM moves WHERE game_id = ? ORDER BY ply ASC", (game_id,))
     history = [row[0] for row in cursor.fetchall()]
 
-    role = "model_a" if board.turn == chess.WHITE else "model_b"
-    ai_info = get_ai_info(cursor, game_id, role)
-    if not ai_info:
-        conn.close()
-        raise ValueError(f"No AI assigned for role '{role}'")
-
-    success, ai_from, ai_to, new_fen, game_end, new_ply = perform_ai_move(
-        ai_info, board, history, ai_illegal, last_ply, game_id, settings, user_is_white, cursor, conn
+    ai_from, ai_to, new_fen, game_end, _ = _run_ai_vs_ai_to_completion(
+        board, history, ai_illegal, last_ply, game_id, settings, user_is_white, cursor, conn
     )
-
-    if game_end != "no":
-        cursor.execute("UPDATE games SET status = 'ended' WHERE id = ?", (game_id,))
 
     conn.commit()
     conn.close()
