@@ -1,5 +1,6 @@
 import os
 import subprocess
+import threading
 import chess
 import time
 
@@ -117,6 +118,15 @@ class StockfishEngine:
 
     def get_best_move(self, fen, depth=15):
 
+        # MultiPV may have been left at 3 by a prior get_top3_moves() call
+        # on this same engine process. If it isn't reset to 1 here, the
+        # engine emits info lines for PV 1/2/3 and the loop below would
+        # overwrite `evaluation` with whichever PV line arrives last -
+        # silently corrupting the reported evaluation/centipawn loss.
+        self.send("setoption name MultiPV value 1")
+        self.send("isready")
+        self.wait_for("readyok")
+
         self.send(f"position fen {fen}")
         self.send(f"go depth {depth}")
 
@@ -156,6 +166,11 @@ class StockfishEngine:
 
 
 _engine = None
+# A single Stockfish subprocess is shared across every request. FastAPI can
+# serve requests concurrently, so without this lock two overlapping games
+# (e.g. two /step polls arriving close together) could interleave UCI
+# commands/output on the same stdin/stdout and corrupt each other's moves.
+_engine_lock = threading.Lock()
 
 def get_engine():
     global _engine
@@ -214,7 +229,8 @@ def classify_move(cp_loss):
 
 def get_top3_moves(fen):
 
-    moves = get_engine().get_top3_moves(fen)
+    with _engine_lock:
+        moves = get_engine().get_top3_moves(fen)
 
     return {
         "top3": [
@@ -222,9 +238,9 @@ def get_top3_moves(fen):
         ]
     }
 
-def get_best_move(fen ,depth=15):
-    with _engine:
-        best, evaluation = get_engine().get_best_move(fen)
+def get_best_move(fen, depth=15):
+    with _engine_lock:
+        best, evaluation = get_engine().get_best_move(fen, depth=depth)
     return best, evaluation
 
 
@@ -236,17 +252,20 @@ def analyze_user_move(before_fen, user_move):
 
     board = chess.Board(before_fen)
 
-    best_move, best_eval = get_engine().get_best_move(before_fen)
+    # Both evaluations are taken under one lock acquisition so no other
+    # request's get_top3_moves() (which flips MultiPV to 3) can land on the
+    # shared engine between the "before" and "after" reads.
+    with _engine_lock:
+        engine = get_engine()
 
-    best_cp = _score(best_eval)
+        best_move, best_eval = engine.get_best_move(before_fen)
+        best_cp = _score(best_eval)
 
-    board.push(chess.Move.from_uci(user_move))
+        board.push(chess.Move.from_uci(user_move))
+        after_fen = board.fen()
 
-    after_fen = board.fen()
-
-    _, played_eval = get_engine().get_best_move(after_fen)
-
-    played_cp = _score(played_eval)
+        _, played_eval = engine.get_best_move(after_fen)
+        played_cp = _score(played_eval)
 
     cp_loss = abs(best_cp - played_cp)
 
