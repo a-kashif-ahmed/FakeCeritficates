@@ -105,4 +105,51 @@ class UserLogin(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
+
+
+# -------------------------------------------------------
+# Levels (guided learning mode)
+# -------------------------------------------------------
+
+class LevelSummary(BaseModel):
+    level_number: int
+    title: str
+    description: Optional[str] = None
+    stars: int
+    completed: bool
+    locked: bool
+
+
+class LevelsListResponse(BaseModel):
+    levels: List[LevelSummary]
+
+
+class LevelStartResponse(BaseModel):
+    session_id: str
+    level_number: int
+    step_order: int
+    total_steps: int
+    fen: str
+    instruction: str
+    emoji: str
+
+
+class LevelMoveRequest(BaseModel):
+    session_id: str
+    from_square: str
+    to_square: str
+    promotion: Optional[str] = None
+
+
+class LevelMoveResponse(BaseModel):
+    correct: bool
+    level_complete: bool
+    stars: int
+    emoji: Optional[str] = None
+    message: str
+    fen: str
+    step_order: Optional[int] = None
+    instruction: Optional[str] = None
+    classification: Optional[str] = None
+    next_level_number: Optional[int] = None
     

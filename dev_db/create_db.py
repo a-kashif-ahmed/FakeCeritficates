@@ -189,8 +189,58 @@ def create_db():
             dialogue_json TEXT NOT NULL
         )
     """)
-    ""
-    
+
+    # -------------------------------------------------------
+    # Levels (guided "learn to play" mode, separate from normal
+    # Human vs AI / AI vs AI games)
+    # -------------------------------------------------------
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS levels (
+            id INTEGER PRIMARY KEY,
+            level_number INTEGER UNIQUE NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS level_steps (
+            id INTEGER PRIMARY KEY,
+            level_id INTEGER REFERENCES levels(id),
+            step_order INTEGER NOT NULL,
+            fen TEXT NOT NULL,
+            instruction TEXT NOT NULL,
+            emoji TEXT NOT NULL,
+            correct_from TEXT NOT NULL,
+            correct_to TEXT NOT NULL,
+            promotion TEXT,
+            UNIQUE(level_id, step_order)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_level_progress (
+            user_id INTEGER REFERENCES users(id),
+            level_id INTEGER REFERENCES levels(id),
+            stars INTEGER DEFAULT 0 CHECK (stars BETWEEN 0 AND 5),
+            completed INTEGER DEFAULT 0 CHECK (completed IN (0, 1)),
+            PRIMARY KEY (user_id, level_id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS level_sessions (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id),
+            level_id INTEGER REFERENCES levels(id),
+            current_step_order INTEGER NOT NULL,
+            fen TEXT NOT NULL,
+            attempts INTEGER DEFAULT 0,
+            status TEXT NOT NULL,
+            created_at TIMESTAMP NOT NULL
+        )
+    """)
 
     conn.commit()
     conn.close()

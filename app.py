@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware  # 1. Import the middleware
 from routers.settings import router as settings_router
 from routers.games import router as games_router
 from routers.themes import router as themes_router
+from routers.levels import router as levels_router
 
 
 
@@ -41,6 +42,7 @@ def read_root():
 app.include_router(settings_router)
 app.include_router(games_router)
 app.include_router(themes_router)
+app.include_router(levels_router)
 
 
 if __name__ == "__main__":
