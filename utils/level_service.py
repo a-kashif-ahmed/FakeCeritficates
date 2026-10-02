@@ -113,6 +113,8 @@ def start_level(level_number: int, user_id: int = USER_ID) -> Dict[str, Any]:
         "fen": fen,
         "instruction": instruction,
         "piece_icon": piece_icon,
+        "hint_from": correct_from,
+        "hint_to": correct_to,
     }
 
 
@@ -217,10 +219,13 @@ def submit_level_move(
                 "message": "Level complete! Great job.",
                 "fen": new_fen,
                 "next_level_number": level_number + 1 if level_number < TOTAL_LEVELS else None,
+                "hint_from": correct_from,
+                "hint_to": correct_to,
             }
         else:
             next_step = steps[step_index + 1]
-            next_order, next_instruction, next_piece_icon, _, _, _ = next_step
+            (next_order, next_instruction, next_piece_icon,
+             next_correct_from, next_correct_to, _) = next_step
 
             cursor.execute("""
                 UPDATE level_sessions
@@ -239,6 +244,8 @@ def submit_level_move(
                 "fen": new_fen,
                 "step_order": next_order,
                 "instruction": next_instruction,
+                "hint_from": next_correct_from,
+                "hint_to": next_correct_to,
             }
     else:
         # Legal, but not the intended teaching move. Rate it honestly with
@@ -263,4 +270,6 @@ def submit_level_move(
             "step_order": step_order,
             "instruction": instruction,
             "classification": analysis["classification"],
+            "hint_from": correct_from,
+            "hint_to": correct_to,
         }

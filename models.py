@@ -132,6 +132,8 @@ class LevelStartResponse(BaseModel):
     fen: str
     instruction: str
     piece_icon: str
+    hint_from: str
+    hint_to: str
 
 
 class LevelMoveRequest(BaseModel):
@@ -152,4 +154,6 @@ class LevelMoveResponse(BaseModel):
     instruction: Optional[str] = None
     classification: Optional[str] = None
     next_level_number: Optional[int] = None
+    hint_from: Optional[str] = None
+    hint_to: Optional[str] = None
     

@@ -158,6 +158,7 @@ cython_debug/
 *.db
 *.sqlite
 *.sqlite3
+backend.zip
 dev_db.zip
 dev_db (2).zip
-backend.zip
+hah.txt
