@@ -211,7 +211,7 @@ def create_db():
             step_order INTEGER NOT NULL,
             fen TEXT NOT NULL,
             instruction TEXT NOT NULL,
-            emoji TEXT NOT NULL,
+            piece_icon TEXT NOT NULL,
             correct_from TEXT NOT NULL,
             correct_to TEXT NOT NULL,
             promotion TEXT,

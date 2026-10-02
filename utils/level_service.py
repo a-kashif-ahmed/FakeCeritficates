@@ -72,7 +72,7 @@ def _get_level_and_step(cursor, level_number: int):
     level_id = level_row[0]
 
     cursor.execute("""
-        SELECT step_order, fen, instruction, emoji, correct_from, correct_to, promotion
+        SELECT step_order, fen, instruction, piece_icon, correct_from, correct_to, promotion
         FROM level_steps WHERE level_id = ? ORDER BY step_order ASC
     """, (level_id,))
     steps = cursor.fetchall()
@@ -94,7 +94,7 @@ def start_level(level_number: int, user_id: int = USER_ID) -> Dict[str, Any]:
 
     level_id, steps = _get_level_and_step(cursor, level_number)
     first_step = steps[0]
-    _, fen, instruction, emoji, correct_from, correct_to, promotion = first_step
+    _, fen, instruction, piece_icon, correct_from, correct_to, promotion = first_step
 
     session_id = str(uuid.uuid4())
     cursor.execute("""
@@ -112,7 +112,7 @@ def start_level(level_number: int, user_id: int = USER_ID) -> Dict[str, Any]:
         "total_steps": len(steps),
         "fen": fen,
         "instruction": instruction,
-        "emoji": emoji,
+        "piece_icon": piece_icon,
     }
 
 
@@ -131,7 +131,7 @@ def submit_level_move(
     - If it's a different but legal move: don't apply/persist it. Run it
       through the same Stockfish-based analysis used for normal Human vs AI
       coaching (utils.stockfish_service.analyze_user_move) and return a star
-      rating for that move, with no emoji - the board stays on the same step
+      rating for that move, with no piece_icon - the board stays on the same step
       so the user can try again.
     - If it isn't even a legal move: raise ValueError (400 at the router).
     """
@@ -154,7 +154,7 @@ def submit_level_move(
         raise ValueError("This level session has already ended")
 
     cursor.execute("""
-        SELECT step_order, instruction, emoji, correct_from, correct_to, promotion
+        SELECT step_order, instruction, piece_icon, correct_from, correct_to, promotion
         FROM level_steps WHERE level_id = ? ORDER BY step_order ASC
     """, (level_id,))
     steps = cursor.fetchall()
@@ -163,7 +163,7 @@ def submit_level_move(
         conn.close()
         raise ValueError("Invalid step for this session")
 
-    _, instruction, emoji, correct_from, correct_to, correct_promotion = steps[step_index]
+    _, instruction, piece_icon, correct_from, correct_to, correct_promotion = steps[step_index]
 
     board = chess.Board(fen)
     uci = from_square + to_square + (promotion or "")
@@ -213,14 +213,14 @@ def submit_level_move(
                 "correct": True,
                 "level_complete": True,
                 "stars": stars,
-                "emoji": emoji,
+                "piece_icon": piece_icon,
                 "message": "Level complete! Great job.",
                 "fen": new_fen,
                 "next_level_number": level_number + 1 if level_number < TOTAL_LEVELS else None,
             }
         else:
             next_step = steps[step_index + 1]
-            next_order, next_instruction, next_emoji, _, _, _ = next_step
+            next_order, next_instruction, next_piece_icon, _, _, _ = next_step
 
             cursor.execute("""
                 UPDATE level_sessions
@@ -234,7 +234,7 @@ def submit_level_move(
                 "correct": True,
                 "level_complete": False,
                 "stars": stars,
-                "emoji": next_emoji,
+                "piece_icon": next_piece_icon,
                 "message": "Nicely done! On to the next move.",
                 "fen": new_fen,
                 "step_order": next_order,
@@ -257,7 +257,7 @@ def submit_level_move(
             "correct": False,
             "level_complete": False,
             "stars": stars,
-            "emoji": None,  # emoji is removed once the user deviates from the taught move
+            "piece_icon": None,  # piece_icon is removed once the user deviates from the taught move
             "message": f"That's a legal move ({analysis['classification']}), but not the move this lesson is teaching. Try again!",
             "fen": fen,  # board stays put - this attempt is not applied
             "step_order": step_order,

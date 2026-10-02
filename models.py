@@ -131,7 +131,7 @@ class LevelStartResponse(BaseModel):
     total_steps: int
     fen: str
     instruction: str
-    emoji: str
+    piece_icon: str
 
 
 class LevelMoveRequest(BaseModel):
@@ -145,7 +145,7 @@ class LevelMoveResponse(BaseModel):
     correct: bool
     level_complete: bool
     stars: int
-    emoji: Optional[str] = None
+    piece_icon: Optional[str] = None
     message: str
     fen: str
     step_order: Optional[int] = None
