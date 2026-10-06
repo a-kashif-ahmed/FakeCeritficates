@@ -175,6 +175,16 @@ def insert_sample_data():
     """)
 
     cursor.execute("""
+        INSERT OR REPLACE INTO levels (id, level_number, title, description)
+        VALUES (21, 21, 'Opening Principles II', 'A real opening sequence: play a move, see the reply, keep developing.')
+    """)
+
+    cursor.execute("""
+        INSERT OR REPLACE INTO levels (id, level_number, title, description)
+        VALUES (22, 22, 'Capture, Chase, Centralize', 'Capture with check, watch the forced reply, then press your advantage.')
+    """)
+
+    cursor.execute("""
         INSERT OR REPLACE INTO level_steps (level_id, step_order, fen, instruction, piece_icon, correct_from, correct_to, promotion)
         VALUES (1, 1, '7k/8/8/8/3p4/4Q3/8/4K3 w - - 0 1', 'Your Queen is in danger! A pawn is attacking it. Move it to safety on h6.', 'white_queen', 'e3', 'h6', NULL)
     """)
@@ -253,6 +263,48 @@ def insert_sample_data():
     cursor.execute("""
         INSERT OR REPLACE INTO level_steps (level_id, step_order, fen, instruction, piece_icon, correct_from, correct_to, promotion)
         VALUES (20, 1, '1k6/8/K7/8/8/8/8/7Q w - - 0 1', 'You''ve learned so much! Finish the game: checkmate with your Queen on b7.', 'white_queen', 'h1', 'b7', NULL)
+    """)
+
+    # ---- Level 21: Opening Principles II (user -> opponent -> user) ----
+    cursor.execute("""
+        INSERT OR REPLACE INTO level_steps
+            (level_id, step_order, fen, instruction, piece_icon, correct_from, correct_to, promotion, step_type)
+        VALUES (21, 1, 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+                'Open with your King''s pawn - play the classic e4.', 'white_pawn', 'e2', 'e4', NULL, 'user_move')
+    """)
+    cursor.execute("""
+        INSERT OR REPLACE INTO level_steps
+            (level_id, step_order, fen, instruction, piece_icon, correct_from, correct_to, promotion, step_type)
+        VALUES (21, 2, 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
+                'The computer replies with the mirror move, e5.', 'black_pawn', 'e7', 'e5', NULL, 'opponent_move')
+    """)
+    cursor.execute("""
+        INSERT OR REPLACE INTO level_steps
+            (level_id, step_order, fen, instruction, piece_icon, correct_from, correct_to, promotion, step_type)
+        VALUES (21, 3, 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
+                'Develop your King''s Knight to its natural square, f3.', 'white_knight', 'g1', 'f3', NULL, 'user_move')
+    """)
+
+    # ---- Level 22: Capture, Chase, Centralize (user -> opponent -> user) ----
+    cursor.execute("""
+        INSERT OR REPLACE INTO level_steps
+            (level_id, step_order, fen, instruction, piece_icon, correct_from, correct_to, promotion, step_type)
+        VALUES (22, 1, '3r2k1/5p1p/8/8/8/8/8/3Q2K1 w - - 0 1',
+                'The Rook on d8 is hanging - and your Queen can take it WITH check! Capture it.',
+                'white_queen', 'd1', 'd8', NULL, 'user_move')
+    """)
+    cursor.execute("""
+        INSERT OR REPLACE INTO level_steps
+            (level_id, step_order, fen, instruction, piece_icon, correct_from, correct_to, promotion, step_type)
+        VALUES (22, 2, '3Q2k1/5p1p/8/8/8/8/8/6K1 b - - 0 1',
+                'In check, the King has only one square to run to.', 'black_king', 'g8', 'g7', NULL, 'opponent_move')
+    """)
+    cursor.execute("""
+        INSERT OR REPLACE INTO level_steps
+            (level_id, step_order, fen, instruction, piece_icon, correct_from, correct_to, promotion, step_type)
+        VALUES (22, 3, '3Q4/5pkp/8/8/8/8/8/6K1 w - - 1 2',
+                'Keep up the pressure - centralize your Queen to d4, checking again.',
+                'white_queen', 'd8', 'd4', NULL, 'user_move')
     """)
 
     conn.commit()

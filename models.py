@@ -146,7 +146,10 @@ class LevelMoveRequest(BaseModel):
 class LevelMoveResponse(BaseModel):
     correct: bool
     level_complete: bool
-    stars: int
+    # Only set when there's a real score to show: a wrong-but-legal move
+    # (rated immediately) or the level's final completion. An intermediate
+    # "advance to the next step" response has no score yet.
+    stars: Optional[int] = None
     piece_icon: Optional[str] = None
     message: str
     fen: str
@@ -156,4 +159,5 @@ class LevelMoveResponse(BaseModel):
     next_level_number: Optional[int] = None
     hint_from: Optional[str] = None
     hint_to: Optional[str] = None
+    opponent_moves: Optional[List[Dict[str, str]]] = None
     

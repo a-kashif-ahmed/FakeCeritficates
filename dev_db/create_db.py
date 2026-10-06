@@ -215,6 +215,7 @@ def create_db():
             correct_from TEXT NOT NULL,
             correct_to TEXT NOT NULL,
             promotion TEXT,
+            step_type TEXT NOT NULL DEFAULT 'user_move' CHECK (step_type IN ('user_move', 'opponent_move')),
             UNIQUE(level_id, step_order)
         )
     """)

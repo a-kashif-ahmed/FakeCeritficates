@@ -8,7 +8,7 @@ from utils.connect_db import get_connection
 from utils.stockfish_service import analyze_user_move
 from config import USER_ID
 
-TOTAL_LEVELS = 20
+TOTAL_LEVELS = 22
 
 # Classification (from utils/stockfish_service.classify_move) -> stars out of 5.
 _CLASSIFICATION_STARS = {
@@ -72,12 +72,15 @@ def _get_level_and_step(cursor, level_number: int):
     level_id = level_row[0]
 
     cursor.execute("""
-        SELECT step_order, fen, instruction, piece_icon, correct_from, correct_to, promotion
+        SELECT step_order, fen, instruction, piece_icon, correct_from, correct_to, promotion, step_type
         FROM level_steps WHERE level_id = ? ORDER BY step_order ASC
     """, (level_id,))
     steps = cursor.fetchall()
     if not steps:
         raise ValueError(f"Level {level_number} has no steps configured")
+    if steps[0][7] != "user_move":
+        # A level must always open with something for the player to do.
+        raise ValueError(f"Level {level_number}'s first step must be a user_move")
 
     return level_id, steps
 
@@ -94,7 +97,7 @@ def start_level(level_number: int, user_id: int = USER_ID) -> Dict[str, Any]:
 
     level_id, steps = _get_level_and_step(cursor, level_number)
     first_step = steps[0]
-    _, fen, instruction, piece_icon, correct_from, correct_to, promotion = first_step
+    _, fen, instruction, piece_icon, correct_from, correct_to, promotion, _step_type = first_step
 
     session_id = str(uuid.uuid4())
     cursor.execute("""
@@ -156,7 +159,7 @@ def submit_level_move(
         raise ValueError("This level session has already ended")
 
     cursor.execute("""
-        SELECT step_order, instruction, piece_icon, correct_from, correct_to, promotion
+        SELECT step_order, instruction, piece_icon, correct_from, correct_to, promotion, step_type
         FROM level_steps WHERE level_id = ? ORDER BY step_order ASC
     """, (level_id,))
     steps = cursor.fetchall()
@@ -165,7 +168,12 @@ def submit_level_move(
         conn.close()
         raise ValueError("Invalid step for this session")
 
-    _, instruction, piece_icon, correct_from, correct_to, correct_promotion = steps[step_index]
+    _, instruction, piece_icon, correct_from, correct_to, correct_promotion, step_type = steps[step_index]
+    if step_type != "user_move":
+        # Shouldn't happen - current_step_order should only ever point at a
+        # user_move step, since opponent_move steps are auto-played below.
+        conn.close()
+        raise ValueError("This step isn't awaiting a player move")
 
     board = chess.Board(fen)
     uci = from_square + to_square + (promotion or "")
@@ -188,11 +196,35 @@ def submit_level_move(
     if is_correct:
         board.push(move)
         new_fen = board.fen()
-        stars = max(5 - min(attempts, 3), 2)
 
-        is_last_step = step_order >= len(steps)
+        # Walk forward through any scripted opponent_move steps - these are
+        # pre-authored content, not live engine play, so they're auto-played
+        # unconditionally. Still checked against legal_moves as a safety net
+        # against bad content rather than silently corrupting the board.
+        opponent_moves: List[Dict[str, str]] = []
+        next_index = step_index + 1
+        while next_index < len(steps) and steps[next_index][6] == "opponent_move":
+            (_, _, _, opp_from, opp_to, opp_promo, _) = steps[next_index]
+            opp_uci = opp_from + opp_to + (opp_promo or "")
+            opp_move = chess.Move.from_uci(opp_uci)
+            if opp_move not in board.legal_moves:
+                conn.close()
+                raise ValueError(
+                    f"Scripted opponent move {opp_uci} is illegal at step {next_index + 1} "
+                    f"of this level - content needs fixing"
+                )
+            board.push(opp_move)
+            new_fen = board.fen()
+            opponent_moves.append({"from": opp_from, "to": opp_to})
+            next_index += 1
 
-        if is_last_step:
+        is_level_complete = next_index >= len(steps)
+
+        if is_level_complete:
+            # Stars reflect every wrong attempt across the whole level, not
+            # just the final step.
+            stars = max(5 - min(attempts, 3), 2)
+
             cursor.execute("""
                 INSERT INTO user_level_progress (user_id, level_id, stars, completed)
                 VALUES (?, ?, ?, 1)
@@ -221,31 +253,39 @@ def submit_level_move(
                 "next_level_number": level_number + 1 if level_number < TOTAL_LEVELS else None,
                 "hint_from": correct_from,
                 "hint_to": correct_to,
+                "opponent_moves": opponent_moves,
             }
         else:
-            next_step = steps[step_index + 1]
+            next_step = steps[next_index]
             (next_order, next_instruction, next_piece_icon,
-             next_correct_from, next_correct_to, _) = next_step
+             next_correct_from, next_correct_to, _, _) = next_step
 
+            # Attempts accumulate across the whole session now (not reset
+            # per step), so the final star count reflects the full level.
             cursor.execute("""
                 UPDATE level_sessions
-                SET fen = ?, current_step_order = ?, attempts = 0
+                SET fen = ?, current_step_order = ?
                 WHERE id = ?
             """, (new_fen, next_order, session_id))
             conn.commit()
             conn.close()
 
+            message = "Nicely done! On to the next move."
+            if opponent_moves:
+                message = "Nicely done! The opponent replies - now it's your move again."
+
             return {
                 "correct": True,
                 "level_complete": False,
-                "stars": stars,
+                "stars": None,
                 "piece_icon": next_piece_icon,
-                "message": "Nicely done! On to the next move.",
+                "message": message,
                 "fen": new_fen,
                 "step_order": next_order,
                 "instruction": next_instruction,
                 "hint_from": next_correct_from,
                 "hint_to": next_correct_to,
+                "opponent_moves": opponent_moves,
             }
     else:
         # Legal, but not the intended teaching move. Rate it honestly with
