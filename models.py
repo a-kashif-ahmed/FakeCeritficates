@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 
 class Settings(BaseModel):
     language: Optional[str] = None
@@ -14,6 +14,7 @@ class Settings(BaseModel):
     ai_illegal: Optional[int] = None
     ai_allowed_offer: Optional[int] = None
     long_horizon_planning: Optional[int] = None
+    guided_difficulty: Optional[int] = None
 
     board_theme_name: Optional[str] = None
     piece_theme_name: Optional[str] = None
@@ -160,4 +161,68 @@ class LevelMoveResponse(BaseModel):
     hint_from: Optional[str] = None
     hint_to: Optional[str] = None
     opponent_moves: Optional[List[Dict[str, str]]] = None
+
+
+# -------------------------------------------------------
+# Guided games ("Learn to Play")
+# -------------------------------------------------------
+
+class GuidedStartRequest(BaseModel):
+    # None means "use the difficulty saved in settings".
+    difficulty: Optional[int] = None
+
+
+class TeachingDialog(BaseModel):
+    concept_id: str
+    params: Dict[str, str] = {}
+
+
+class GuidedStartResponse(BaseModel):
+    session_id: str
+    fen: str
+    user_color: str
+    difficulty: int
+    difficulty_name: str
+    # Set when the weak engine plays the opening move (player is black).
+    from_square: Optional[str] = None
+    to_square: Optional[str] = None
+    dialogs: List[TeachingDialog] = []
+
+
+class GuidedMoveRequest(BaseModel):
+    from_square: str
+    to_square: str
+    promotion: Optional[str] = None
+
+
+class GuidedMoveResponse(BaseModel):
+    fen: str
+    game_end: str
+    ai_from: Optional[str] = None
+    ai_to: Optional[str] = None
+    analysis: Optional[Dict[str, Any]] = None
+    dialogs: List[TeachingDialog] = []
+
+
+class GuidedShowResponse(BaseModel):
+    session_id: str
+    fen: str
+    status: str
+    user_color: str
+    difficulty: int
+    ply: int
+
+
+class GuidedHintResponse(BaseModel):
+    top3: List[str] = []
+
+
+class GuidedSummaryResponse(BaseModel):
+    session_id: str
+    status: str
+    result: Optional[str] = None
+    difficulty: int
+    total_moves: int
+    classifications: Dict[str, int] = {}
+    concepts_taught: List[str] = []
     

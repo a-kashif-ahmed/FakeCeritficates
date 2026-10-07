@@ -243,8 +243,74 @@ def create_db():
         )
     """)
 
+    # -------------------------------------------------------
+    # "Learn to Play" - a live guided game against a weak engine
+    # -------------------------------------------------------
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS guided_game_sessions (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id),
+            difficulty INTEGER NOT NULL DEFAULT 0,
+            user_is_white INTEGER NOT NULL DEFAULT 1,
+            fen TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'active',
+            result TEXT,
+            created_at TIMESTAMP NOT NULL,
+            ended_at TIMESTAMP
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS guided_game_moves (
+            id INTEGER PRIMARY KEY,
+            session_id TEXT REFERENCES guided_game_sessions(id),
+            ply INTEGER NOT NULL,
+            side TEXT NOT NULL CHECK (side IN ('user', 'ai')),
+            uci TEXT NOT NULL,
+            san TEXT,
+            fen TEXT NOT NULL,
+            classification TEXT,
+            cp_loss INTEGER,
+            best_move TEXT
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_taught_concepts (
+            user_id INTEGER REFERENCES users(id),
+            concept_id TEXT NOT NULL,
+            times_shown INTEGER NOT NULL DEFAULT 1,
+            first_shown_at TIMESTAMP NOT NULL,
+            last_shown_at TIMESTAMP NOT NULL,
+            PRIMARY KEY (user_id, concept_id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS guided_dialog_log (
+            id INTEGER PRIMARY KEY,
+            session_id TEXT REFERENCES guided_game_sessions(id),
+            ply INTEGER NOT NULL,
+            concept_id TEXT NOT NULL
+        )
+    """)
+
+    # Older databases were created before this column existed, and
+    # CREATE TABLE IF NOT EXISTS cannot add columns to existing tables.
+    _add_column_if_missing(cursor, "game_settings", "guided_difficulty",
+                           "INTEGER NOT NULL DEFAULT 0")
+
     conn.commit()
     conn.close()
+
+
+def _add_column_if_missing(cursor, table, column, definition):
+    cursor.execute(f"PRAGMA table_info({table})")
+    existing = [row[1] for row in cursor.fetchall()]
+    if column not in existing:
+        cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
 
 if __name__ == "__main__":
     create_db()

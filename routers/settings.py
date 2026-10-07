@@ -18,7 +18,7 @@ async def update_settings(settings: Settings):
     cursor.execute("PRAGMA foreign_keys = ON;")
 
     ui_data = {k: v for k, v in data.items() if k in ['language', 'board_theme_id', 'piece_theme_id', 'toggle_bar', 'money_widget']}
-    game_data = {k: v for k, v in data.items() if k in ['user_color', 'premove', 'play_till', 'watch_only']}
+    game_data = {k: v for k, v in data.items() if k in ['user_color', 'premove', 'play_till', 'watch_only', 'guided_difficulty']}
     ai_data = {k: v for k, v in data.items() if k in ['ai_illegal', 'ai_allowed_offer', 'long_horizon_planning']}
 
     # Theme name lookup for UI

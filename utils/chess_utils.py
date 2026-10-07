@@ -111,6 +111,35 @@ def force_ai_move(board: chess.Board, ai_move: Dict[str, Any]) -> Tuple[bool, Op
     except (ValueError, KeyError):
         return False, None, None
 
+def detect_game_end(board: chess.Board, settings: Dict[str, Any], user_is_white: bool) -> str:
+    """
+    Return "no" while the game is still going, otherwise the reason it is
+    over ("user_checkmate", "stalemate", ...). Pure function: it does not
+    touch the database, so any kind of game session can use it.
+    """
+    # Check king captures first (always ends game)
+    white_king_gone = board.king(chess.WHITE) is None
+    black_king_gone = board.king(chess.BLACK) is None
+    if white_king_gone or black_king_gone:
+        loser_is_white = white_king_gone
+        loser_is_user = loser_is_white == user_is_white
+        return "user_kingdead" if loser_is_user else "ai_kingdead"
+
+    play_till = settings.get('play_till', 1)
+    if play_till == 1 and board.is_game_over():
+        loser_is_white = board.turn == chess.WHITE  # loser is the one to move
+        loser_is_user = loser_is_white == user_is_white
+        if board.is_checkmate():
+            return "user_checkmate" if loser_is_user else "ai_checkmate"
+        if board.is_stalemate() or board.is_insufficient_material():
+            return "stalemate"
+        if board.is_repetition():
+            return "draw_by_repetition"
+        return "draw"
+
+    return "no"
+
+
 def check_game_end(
     board: chess.Board, 
     settings: Dict[str, Any], 
@@ -120,41 +149,17 @@ def check_game_end(
     conn
 ) -> str:
     """
-    Check if game ended based on settings.
-    Updates games table if ended.
+    detect_game_end() plus the bookkeeping: when the game is over, write it
+    into the games table.
     user_is_white: True if user plays as white.
     """
     from datetime import datetime
-    
-    game_end = "no"
-    
-    # Check king captures first (always ends game)
-    white_king_gone = board.king(chess.WHITE) is None
-    black_king_gone = board.king(chess.BLACK) is None
-    if white_king_gone or black_king_gone:
-        loser_is_white = white_king_gone
-        loser_is_user = loser_is_white == user_is_white
-        game_end = "user_kingdead" if loser_is_user else "ai_kingdead"
+
+    game_end = detect_game_end(board, settings, user_is_white)
+
+    if game_end != "no":
         now = datetime.now().isoformat()
         cursor.execute("UPDATE games SET status = 'finished', ended_at = ? WHERE id = ?", (now, game_id))
         conn.commit()
-        return game_end
-    
-    play_till = settings.get('play_till', 1)
-    if play_till == 1 and board.is_game_over():
-        loser_is_white = board.turn == chess.WHITE  # loser is the one to move
-        loser_is_user = loser_is_white == user_is_white
-        if board.is_checkmate():
-            game_end = "user_checkmate" if loser_is_user else "ai_checkmate"
-        elif board.is_stalemate() or board.is_insufficient_material():
-            game_end = "stalemate"
-        elif board.is_repetition():
-            game_end = "draw_by_repetition"
-        else:
-            game_end = "draw"
-        now = datetime.now().isoformat()
-        cursor.execute("UPDATE games SET status = 'finished', ended_at = ? WHERE id = ?", (now, game_id))
-        conn.commit()
-        return game_end
-    
-    return "no"
+
+    return game_end

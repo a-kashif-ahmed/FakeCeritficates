@@ -13,6 +13,7 @@ from routers.settings import router as settings_router
 from routers.games import router as games_router
 from routers.themes import router as themes_router
 from routers.levels import router as levels_router
+from routers.guided import router as guided_router
 
 
 
@@ -43,6 +44,7 @@ app.include_router(settings_router)
 app.include_router(games_router)
 app.include_router(themes_router)
 app.include_router(levels_router)
+app.include_router(guided_router)
 
 
 if __name__ == "__main__":
